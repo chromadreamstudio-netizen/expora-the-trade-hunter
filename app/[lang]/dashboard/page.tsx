@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, Target, Mail, Zap, MessageCircle, MapPin, Phone, LogOut, User } from "lucide-react";
+import { LayoutDashboard, Target, Mail, Zap, MessageCircle, MapPin, Phone, LogOut, Home, Briefcase } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -88,9 +88,20 @@ export default function DashboardPage() {
           </div>
         </div>
         <nav className="flex-1 py-6 px-4 space-y-2">
+          {/* زر العودة للرئيسية (Landing Page) */}
+          <button onClick={() => router.push(`/${currentLangCode}`)} className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 hover:text-white rounded-xl font-medium">
+            <Home className="w-5 h-5" /> {isRtl ? 'الصفحة الرئيسية' : 'Home'}
+          </button>
+          
           <button className="w-full flex items-center gap-3 px-4 py-3 bg-blue-600/10 text-blue-400 rounded-xl font-medium border border-blue-500/25">
             <LayoutDashboard className="w-5 h-5" /> {isRtl ? 'الصيد الجديد' : 'New Hunt'}
           </button>
+
+          {/* زر لوحة الـ CRM التي طلبناها للإحصائيات الداخلية */}
+          <button onClick={() => router.push(`/${currentLangCode}/crm`)} className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 hover:text-white rounded-xl font-medium">
+            <Briefcase className="w-5 h-5" /> {isRtl ? 'إدارة الصفقات (CRM)' : 'Deals & RFQs'}
+          </button>
+
           <button onClick={() => router.push(`/${currentLangCode}/pricing`)} className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 hover:text-white rounded-xl font-medium">
             <Target className="w-5 h-5" /> {isRtl ? 'الباقات والاشتراك' : 'Pricing'}
           </button>
@@ -160,7 +171,7 @@ export default function DashboardPage() {
                     <p className="text-sm text-slate-300 whitespace-pre-wrap">{lead.drafted_whatsapp}</p>
                   </div>
                   <div className="bg-blue-950/20 border border-blue-900/50 rounded-xl p-4">
-                    <span className="text-sm font-bold text-blue-400 flex items-center gap-2 mb-2"><Mail className="w-4 h-4"/> مسودة البريد والإرسال الآلي</span>
+                    <span className="text-sm font-bold text-blue-400 flex items-center gap-2 mb-2"><Mail className="w-4 h-4"/> مسودة البريد (جاهزة للإرسال التلقائي عبر الدومين الموثق)</span>
                     <pre className="text-xs text-slate-300 whitespace-pre-wrap font-sans">{lead.drafted_email}</pre>
                   </div>
                 </div>
