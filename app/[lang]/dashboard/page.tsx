@@ -36,7 +36,8 @@ export default function DashboardPage() {
     setLoading(true); setResults(null);
 
     try {
-      const response = await fetch("http://178.105.30.59:8000/api/generate-leads", {
+      // تم التعديل هنا لاستخدام مسار الـ API الداخلي الآمن
+      const response = await fetch("/api/generate-leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
