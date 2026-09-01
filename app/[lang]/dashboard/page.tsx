@@ -53,20 +53,19 @@ export default function DashboardPage() {
       const responseData = await response.json();
       console.log("📦 البيانات المستلمة:", responseData);
 
-      // مطابقة هيكل JSON القادم من الباك إند
+      // مطابقة هيكل JSON القادم من الباك إند بدقة
       const actualData = responseData.data || responseData;
 
       if (response.ok && actualData && actualData.leads) {
         if (actualData.leads.length === 0) {
-          // السيرفر يعمل ولكن لم يجد نتائج
           setResults({ error: "اكتمل البحث بنجاح، ولكن لم يتم العثور على عملاء لهذا الرابط في الوقت الحالي." });
         } else {
-          // السيرفر يعمل ووجد نتائج
           setResults({ leads: actualData.leads });
         }
       } else if (responseData && responseData.error) {
-        // التقاط الخطأ القادم من السيرفر الألماني أو ملف الوسيط
         setResults({ error: responseData.error });
+      } else if (actualData && actualData.error) {
+        setResults({ error: actualData.error });
       } else {
         setResults({ error: "فشل في جلب البيانات من السيرفر. تأكد من عمل السيرفر الألماني." });
       }
@@ -132,7 +131,6 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* صندوق عرض الأخطاء أو رسائل التنبيه للمستخدم مباشرة */}
         {results && results.error && (
           <div className="bg-red-950/40 border border-red-900 rounded-2xl p-6 mb-8 text-red-400 flex flex-col gap-2 shadow-lg">
             <h4 className="font-bold text-lg text-red-500 flex items-center gap-2">
