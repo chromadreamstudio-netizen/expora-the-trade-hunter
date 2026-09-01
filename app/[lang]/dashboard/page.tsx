@@ -122,7 +122,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">{isRtl ? 'السوق المستهدف (اختياري - الذكاء الاصطناعي يكتشفه)' : 'Target Market (Optional - AI Auto-Detect)'}</label>
-              <input type="text" value={targetMarket} onChange={(e) => setTargetMarket(e.target.value)} placeholder={isRtl ? 'اتركه فارغاً للاستنتاج التلقائي أو حدد دولة...' : 'Leave empty for auto-detect or specify country...'} className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-white focus:border-blue-500 outline-none" disabled={loading} />
+              <input type="text" value={targetMarket} onChange={(e) => setTargetMarket(e.target.value)} placeholder={isRtl ? 'اتركه فارغاً للاستنتاج التلقائي...' : 'Leave empty for auto-detect...'} className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-white focus:border-blue-500 outline-none" disabled={loading} />
             </div>
           </div>
           <button onClick={handleStartHunt} disabled={loading || !targetUrl} className={`w-full rounded-xl px-6 py-4 font-bold text-white flex justify-center gap-2 ${loading ? 'bg-slate-700' : 'bg-blue-600 hover:bg-blue-500'}`}>
@@ -171,7 +171,7 @@ export default function DashboardPage() {
 
                   <div className="bg-blue-950/20 border border-blue-900/50 rounded-xl p-4">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-bold text-blue-400 flex items-center gap-2"><Mail className="w-4 h-4"/> مسودة البريد وإرسال Resend الآلي</span>
+                      <span className="text-sm font-bold text-blue-400 flex items-center gap-2"><Mail className="w-4 h-4"/> مسودة البريد والإرسال الآلي</span>
                     </div>
                     <pre className="text-xs text-slate-300 whitespace-pre-wrap font-sans">{lead.drafted_email}</pre>
                   </div>
