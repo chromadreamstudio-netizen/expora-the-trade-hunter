@@ -13,7 +13,7 @@ export default function DashboardPage() {
 
   const [user, setUser] = useState<any>(null);
   const [targetUrl, setTargetUrl] = useState("");
-  const [targetMarket, setTargetMarket] = useState("Kenya, Africa");
+  const [targetMarket, setTargetMarket] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
 
@@ -53,7 +53,6 @@ export default function DashboardPage() {
       const responseData = await response.json();
       console.log("📦 البيانات المستلمة:", responseData);
 
-      // مطابقة هيكل JSON القادم من الباك إند بدقة
       const actualData = responseData.data || responseData;
 
       if (response.ok && actualData && actualData.leads) {
@@ -112,7 +111,7 @@ export default function DashboardPage() {
       <main className="flex-1 overflow-y-auto p-8 max-w-6xl mx-auto">
         <div className="mb-10">
           <h3 className="text-3xl font-bold text-white mb-2">{isRtl ? 'استكشاف الأسواق العالمية' : 'Global Market Hunter'}</h3>
-          <p className="text-slate-400">{isRtl ? 'أدخل رابط منتجك وحدد السوق لنبحث عن العملاء ونجهز المراسلة.' : 'Enter your product URL and target market to hunt leads.'}</p>
+          <p className="text-slate-400">{isRtl ? 'أدخل رابط منتجك ودع الذكاء الاصطناعي يستكشف الأسواق ويبحث عن العملاء.' : 'Enter your product URL and let AI auto-detect markets and hunt leads.'}</p>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl mb-8">
@@ -122,12 +121,12 @@ export default function DashboardPage() {
               <input type="url" value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} placeholder="https://..." className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-white focus:border-blue-500 outline-none" disabled={loading} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">{isRtl ? 'السوق المستهدف (الدولة)' : 'Target Market'}</label>
-              <input type="text" value={targetMarket} onChange={(e) => setTargetMarket(e.target.value)} className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-white focus:border-blue-500 outline-none" disabled={loading} />
+              <label className="block text-sm font-medium text-slate-300 mb-2">{isRtl ? 'السوق المستهدف (اختياري - الذكاء الاصطناعي يكتشفه)' : 'Target Market (Optional - AI Auto-Detect)'}</label>
+              <input type="text" value={targetMarket} onChange={(e) => setTargetMarket(e.target.value)} placeholder={isRtl ? 'اتركه فارغاً للاستنتاج التلقائي أو حدد دولة...' : 'Leave empty for auto-detect or specify country...'} className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-white focus:border-blue-500 outline-none" disabled={loading} />
             </div>
           </div>
           <button onClick={handleStartHunt} disabled={loading || !targetUrl} className={`w-full rounded-xl px-6 py-4 font-bold text-white flex justify-center gap-2 ${loading ? 'bg-slate-700' : 'bg-blue-600 hover:bg-blue-500'}`}>
-            <Zap className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} /> {loading ? (isRtl ? 'جاري الاستكشاف بالذكاء الاصطناعي...' : 'Hunting...') : (isRtl ? 'بدء الصيد الشامل' : 'Start Global Hunt')}
+            <Zap className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} /> {loading ? (isRtl ? 'جاري الاستكشاف التلقائي والبحث العميق...' : 'AI Hunting...') : (isRtl ? 'بدء الصيد الشامل' : 'Start Global Hunt')}
           </button>
         </div>
 
@@ -172,7 +171,7 @@ export default function DashboardPage() {
 
                   <div className="bg-blue-950/20 border border-blue-900/50 rounded-xl p-4">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-bold text-blue-400 flex items-center gap-2"><Mail className="w-4 h-4"/> مسودة البريد</span>
+                      <span className="text-sm font-bold text-blue-400 flex items-center gap-2"><Mail className="w-4 h-4"/> مسودة البريد وإرسال Resend الآلي</span>
                     </div>
                     <pre className="text-xs text-slate-300 whitespace-pre-wrap font-sans">{lead.drafted_email}</pre>
                   </div>
