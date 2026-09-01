@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { Globe, Target, Zap, ChevronDown, ArrowRight, ShieldCheck, Users, MessageCircle, Briefcase } from "lucide-react";
+import Footer from '@/app/components/Footer';
 
 export default function LandingPage() {
   const params = useParams();
@@ -152,10 +153,8 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
-      <footer className="border-t border-slate-800 bg-[#020617] py-8 text-center text-slate-500 text-sm">
-        <p>© 2026 Expora the trade hunter. All rights reserved.</p>
-      </footer>
+      
+      <Footer isRtl={isRtl} />
     </main>
   );
 }

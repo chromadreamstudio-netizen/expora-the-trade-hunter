@@ -3,21 +3,17 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* تثبيت ألوان الهوية البصرية لـ Expora */
+  --background: #020617; /* slate-950 */
+  --foreground: #e2e8f0; /* slate-200 */
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  /* ربط خط Cairo هنا بدلاً من Arial */
+  font-family: var(--font-cairo), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 @layer utilities {
