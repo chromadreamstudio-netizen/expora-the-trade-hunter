@@ -45,19 +45,28 @@ export default function DashboardPage() {
         body: JSON.stringify({
           product_description: targetUrl,
           target_market: targetMarket, 
-          user_email: user?.email || "aha384@gmail.com"
+          user_email: user?.email || "walidtaha384@gmail.com"
         }),
       });
 
       console.log("📥 حالة الرد من السيرفر:", response.status);
-      const data = await response.json();
-      console.log("📦 البيانات المستلمة:", data);
+      const responseData = await response.json();
+      console.log("📦 البيانات المستلمة:", responseData);
 
-      if (response.ok && data && data.leads) {
-        setResults(data);
-      } else if (data && data.error) {
+      // مطابقة هيكل JSON القادم من الباك إند
+      const actualData = responseData.data || responseData;
+
+      if (response.ok && actualData && actualData.leads) {
+        if (actualData.leads.length === 0) {
+          // السيرفر يعمل ولكن لم يجد نتائج
+          setResults({ error: "اكتمل البحث بنجاح، ولكن لم يتم العثور على عملاء لهذا الرابط في الوقت الحالي." });
+        } else {
+          // السيرفر يعمل ووجد نتائج
+          setResults({ leads: actualData.leads });
+        }
+      } else if (responseData && responseData.error) {
         // التقاط الخطأ القادم من السيرفر الألماني أو ملف الوسيط
-        setResults({ error: data.error });
+        setResults({ error: responseData.error });
       } else {
         setResults({ error: "فشل في جلب البيانات من السيرفر. تأكد من عمل السيرفر الألماني." });
       }
@@ -123,12 +132,12 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        {/* الكود الجديد: صندوق عرض الأخطاء للمستخدم مباشرة */}
+        {/* صندوق عرض الأخطاء أو رسائل التنبيه للمستخدم مباشرة */}
         {results && results.error && (
           <div className="bg-red-950/40 border border-red-900 rounded-2xl p-6 mb-8 text-red-400 flex flex-col gap-2 shadow-lg">
             <h4 className="font-bold text-lg text-red-500 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-500"></span>
-              {isRtl ? 'حدث خطأ أثناء الصيد' : 'Hunting Error'}
+              {isRtl ? 'تنبيه' : 'Notice'}
             </h4>
             <p className="text-sm">{results.error}</p>
           </div>
