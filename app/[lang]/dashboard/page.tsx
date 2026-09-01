@@ -33,10 +33,12 @@ export default function DashboardPage() {
 
   const handleStartHunt = async () => {
     if (!targetUrl.includes("http")) return alert("Please enter a valid URL");
-    setLoading(true); setResults(null);
+    setLoading(true); 
+    setResults(null);
 
     try {
-      // تم التعديل هنا لاستخدام مسار الـ API الداخلي الآمن
+      console.log("🚀 جاري إرسال الطلب إلى السيرفر...");
+      
       const response = await fetch("/api/generate-leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -47,11 +49,21 @@ export default function DashboardPage() {
         }),
       });
 
+      console.log("📥 حالة الرد من السيرفر:", response.status);
       const data = await response.json();
-      if (data && data.leads) setResults(data);
-      else setResults({ error: "Failed to fetch leads." });
+      console.log("📦 البيانات المستلمة:", data);
+
+      if (response.ok && data && data.leads) {
+        setResults(data);
+      } else if (data && data.error) {
+        // التقاط الخطأ القادم من السيرفر الألماني أو ملف الوسيط
+        setResults({ error: data.error });
+      } else {
+        setResults({ error: "فشل في جلب البيانات من السيرفر. تأكد من عمل السيرفر الألماني." });
+      }
     } catch (error: any) {
-      setResults({ error: error.message });
+      console.error("❌ خطأ برمجي أثناء الاتصال:", error);
+      setResults({ error: error.message || "حدث خطأ غير متوقع في الشبكة" });
     } finally {
       setLoading(false);
     }
@@ -110,6 +122,17 @@ export default function DashboardPage() {
             <Zap className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} /> {loading ? (isRtl ? 'جاري الاستكشاف بالذكاء الاصطناعي...' : 'Hunting...') : (isRtl ? 'بدء الصيد الشامل' : 'Start Global Hunt')}
           </button>
         </div>
+
+        {/* الكود الجديد: صندوق عرض الأخطاء للمستخدم مباشرة */}
+        {results && results.error && (
+          <div className="bg-red-950/40 border border-red-900 rounded-2xl p-6 mb-8 text-red-400 flex flex-col gap-2 shadow-lg">
+            <h4 className="font-bold text-lg text-red-500 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-500"></span>
+              {isRtl ? 'حدث خطأ أثناء الصيد' : 'Hunting Error'}
+            </h4>
+            <p className="text-sm">{results.error}</p>
+          </div>
+        )}
 
         {results && results.leads && (
           <div className="space-y-6">
