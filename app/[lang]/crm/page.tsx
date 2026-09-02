@@ -3,21 +3,21 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, Target, Mail, MessageCircle, Clock, CheckCircle, Briefcase, Phone, Home, LogOut } from "lucide-react";
+import { LayoutDashboard, Mail, MessageCircle, MapPin, Phone, CheckCircle, Clock, Send, Home, Briefcase, LogOut } from "lucide-react";
 
-export default function CRMDashboard() {
+export default function CRMPage() {
   const router = useRouter();
   const params = useParams();
   const currentLangCode = (params?.lang as string) || "ar";
   const isRtl = currentLangCode === 'ar';
 
   const [user, setUser] = useState<any>(null);
-  const [rfqs, setRfqs] = useState<any[]>([]);
-  const [stats, setStats] = useState({ total: 0, pending: 0, closed: 0 });
+  const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sendingId, setSendingId] = useState<number | null>(null);
 
   useEffect(() => {
-    const fetchRealData = async () => {
+    const fetchLeads = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         router.push(`/${currentLangCode}/login`);
@@ -25,24 +25,18 @@ export default function CRMDashboard() {
       }
       setUser(session.user);
 
-      // جلب البيانات الحقيقية من قاعدة بيانات Supabase
+      // جلب الصفقات الخاصة بالمورد فقط
       const { data, error } = await supabase
         .from('rfq_leads')
         .select('*')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
 
-      if (data) {
-        setRfqs(data);
-        setStats({
-          total: data.length,
-          pending: data.filter(d => d.status === 'pending').length,
-          closed: data.filter(d => d.status === 'closed').length
-        });
-      }
+      if (data) setLeads(data);
       setLoading(false);
     };
-    fetchRealData();
+
+    fetchLeads();
   }, [router, currentLangCode]);
 
   const handleLogout = async () => {
@@ -50,12 +44,50 @@ export default function CRMDashboard() {
     router.push(`/${currentLangCode}/login`);
   };
 
-  const formatDate = (isoString: string) => {
-    const date = new Date(isoString);
-    return date.toLocaleDateString('en-CA');
+  const handleSendEmail = async (lead: any) => {
+    setSendingId(lead.id);
+    
+    const subject = "Exclusive Partnership Opportunity";
+    const body = `Dear Purchasing Team at ${lead.company_name},\n\nWe are currently restructuring our supply chain for your region and looking for an exclusive distribution partner. Are you open to a quick 10-minute Zoom call next week?\n\nBest regards,\nExpora Supplier`;
+
+    try {
+      const response = await fetch("http://178.105.30.59:8000/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to_email: lead.email,
+          subject: subject,
+          body: body,
+          reply_to: user.email
+        }),
+      });
+
+      if (response.ok) {
+        // تحديث حالة الصفقة في قاعدة البيانات إلى "تم الإرسال"
+        await supabase.from('rfq_leads').update({ status: 'contacted' }).eq('id', lead.id);
+        
+        // تحديث الواجهة
+        setLeads(leads.map(l => l.id === lead.id ? { ...l, status: 'contacted' } : l));
+        alert(isRtl ? "تم إرسال مقترح الشراكة بنجاح!" : "Partnership proposal sent successfully!");
+      } else {
+        alert("فشل في إرسال الإيميل. تأكد من السيرفر.");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("حدث خطأ في الاتصال بالسيرفر.");
+    } finally {
+      setSendingId(null);
+    }
   };
 
-  if (!user || loading) return <div className="min-h-screen bg-slate-950 flex justify-center items-center"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div></div>;
+  const handleWhatsApp = (phone: string, companyName: string) => {
+    if (!phone || phone === "N/A" || phone === "No Phone") return alert("Phone not available");
+    const cleanPhone = phone.replace(/\D/g, '');
+    const message = `Hello ${companyName} team, we are looking for an exclusive distribution partner in your market. Are you open to a quick 10-min introductory call next week?`;
+    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  if (loading) return <div className="min-h-screen bg-slate-950 flex justify-center items-center"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div></div>;
 
   return (
     <div className={`flex h-screen bg-slate-950 text-slate-200 font-sans ${isRtl ? 'dir-rtl' : 'dir-ltr'}`} dir={isRtl ? 'rtl' : 'ltr'}>
@@ -68,16 +100,13 @@ export default function CRMDashboard() {
         </div>
         <nav className="flex-1 py-6 px-4 space-y-2">
           <button onClick={() => router.push(`/${currentLangCode}`)} className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 hover:text-white rounded-xl font-medium">
-            <Home className="w-5 h-5" /> {isRtl ? 'الصفحة الرئيسية' : 'Home'}
+            <Home className="w-5 h-5" /> {isRtl ? 'الرئيسية' : 'Home'}
           </button>
           <button onClick={() => router.push(`/${currentLangCode}/dashboard`)} className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 hover:text-white rounded-xl font-medium">
-            <Target className="w-5 h-5" /> {isRtl ? 'الصيد الجديد' : 'New Hunt'}
+            <LayoutDashboard className="w-5 h-5" /> {isRtl ? 'الصيد الجديد' : 'New Hunt'}
           </button>
           <button className="w-full flex items-center gap-3 px-4 py-3 bg-blue-600/10 text-blue-400 rounded-xl font-medium border border-blue-500/25">
             <Briefcase className="w-5 h-5" /> {isRtl ? 'إدارة الصفقات (CRM)' : 'Deals & RFQs'}
-          </button>
-          <button onClick={() => router.push(`/${currentLangCode}/pricing`)} className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 hover:text-white rounded-xl font-medium">
-            <LayoutDashboard className="w-5 h-5" /> {isRtl ? 'الباقات والاشتراك' : 'Pricing'}
           </button>
         </nav>
         <div className="p-4 border-t border-slate-800">
@@ -90,78 +119,75 @@ export default function CRMDashboard() {
       <main className="flex-1 overflow-y-auto p-8 max-w-6xl mx-auto">
         <div className="mb-10 flex justify-between items-end">
           <div>
-            <h3 className="text-3xl font-bold text-white mb-2">{isRtl ? 'إدارة الصفقات وعروض الأسعار' : 'RFQs & Pipeline Management'}</h3>
-            <p className="text-slate-400">{isRtl ? 'بيانات حقيقية مباشرة من قاعدة البيانات للعملاء الذين تم اصطيادهم.' : 'Real live data from database for hunted leads.'}</p>
+            <h3 className="text-3xl font-bold text-white mb-2">{isRtl ? 'غرفة العمليات الاستراتيجية (CRM)' : 'Strategic Deal Room'}</h3>
+            <p className="text-slate-400">{isRtl ? 'راجع الفرص المكتشفة، أضف لمستك، وابدأ التفاوض.' : 'Review discovered opportunities and start negotiations.'}</p>
           </div>
-        </div>
-
-        {/* Real Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl"><Mail className="w-6 h-6"/></div>
-              <div>
-                <p className="text-sm text-slate-400">{isRtl ? 'إجمالي العملاء المستخرجين' : 'Total Extracted Leads'}</p>
-                <p className="text-2xl font-bold text-white">{stats.total}</p>
-              </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex gap-6">
+            <div className="text-center">
+              <span className="block text-2xl font-bold text-emerald-400">{leads.filter(l => l.status === 'contacted').length}</span>
+              <span className="text-xs text-slate-400">{isRtl ? 'تم التواصل' : 'Contacted'}</span>
             </div>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-amber-500/10 text-amber-400 rounded-xl"><Clock className="w-6 h-6"/></div>
-              <div>
-                <p className="text-sm text-slate-400">{isRtl ? 'بانتظار الرد (RFQ)' : 'Pending RFQs'}</p>
-                <p className="text-2xl font-bold text-white">{stats.pending}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl"><CheckCircle className="w-6 h-6"/></div>
-              <div>
-                <p className="text-sm text-slate-400">{isRtl ? 'صفقات ناجحة' : 'Closed Deals'}</p>
-                <p className="text-2xl font-bold text-white">{stats.closed}</p>
-              </div>
+            <div className="text-center">
+              <span className="block text-2xl font-bold text-blue-400">{leads.filter(l => l.status === 'pending').length}</span>
+              <span className="text-xs text-slate-400">{isRtl ? 'في الانتظار' : 'Pending'}</span>
             </div>
           </div>
         </div>
 
-        {/* Real Pipeline List */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
-          {rfqs.length === 0 ? (
-             <div className="p-10 text-center text-slate-400">
-               {isRtl ? 'لم تقم باصطياد أي عميل بعد. اذهب إلى صفحة "الصيد الجديد" لتبدأ.' : 'No leads hunted yet. Go to "New Hunt" to start.'}
-             </div>
+        <div className="space-y-4">
+          {leads.length === 0 ? (
+            <div className="text-center py-20 text-slate-500">
+              {isRtl ? 'لا توجد صفقات حالياً. اذهب إلى "الصيد الجديد" للبدء.' : 'No deals yet. Go to New Hunt to start.'}
+            </div>
           ) : (
-            <table className="w-full text-left border-collapse" dir={isRtl ? 'rtl' : 'ltr'}>
-              <thead>
-                <tr className="bg-slate-950/50 border-b border-slate-800 text-slate-400 text-sm">
-                  <th className="p-6 font-medium">{isRtl ? 'الشركة' : 'Company'}</th>
-                  <th className="p-6 font-medium">{isRtl ? 'التواصل' : 'Contact'}</th>
-                  <th className="p-6 font-medium">{isRtl ? 'الحالة' : 'Status'}</th>
-                  <th className="p-6 font-medium">{isRtl ? 'تاريخ الصيد' : 'Hunted On'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rfqs.map((rfq) => (
-                  <tr key={rfq.id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
-                    <td className="p-6">
-                      <p className="font-bold text-white text-lg">{rfq.company_name}</p>
-                      <p className="text-xs text-slate-500">{rfq.location}</p>
-                    </td>
-                    <td className="p-6 space-y-1">
-                      <p className="text-sm text-slate-300 flex items-center gap-2"><Mail className="w-3 h-3 text-slate-500"/> {rfq.email}</p>
-                      <p className="text-sm text-slate-300 flex items-center gap-2"><Phone className="w-3 h-3 text-slate-500"/> <span dir="ltr">{rfq.phone}</span></p>
-                    </td>
-                    <td className="p-6">
-                      {rfq.status === 'pending' && <span className="bg-amber-500/10 text-amber-400 px-3 py-1 rounded-full text-xs font-bold">{isRtl ? 'تم الإرسال - بانتظار الرد' : 'Sent - Pending'}</span>}
-                      {rfq.status === 'closed' && <span className="bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full text-xs font-bold">{isRtl ? 'تم الإغلاق' : 'Closed Won'}</span>}
-                    </td>
-                    <td className="p-6 text-sm text-slate-400">{formatDate(rfq.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            leads.map((lead) => (
+              <div key={lead.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm hover:border-slate-700 transition-colors">
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <h4 className="text-xl font-bold text-white">{lead.company_name}</h4>
+                    {lead.status === 'contacted' ? (
+                      <span className="bg-emerald-500/20 text-emerald-400 text-xs px-2 py-1 rounded-md flex items-center gap-1"><CheckCircle className="w-3 h-3"/> {isRtl ? 'تم التواصل' : 'Contacted'}</span>
+                    ) : (
+                      <span className="bg-blue-500/20 text-blue-400 text-xs px-2 py-1 rounded-md flex items-center gap-1"><Clock className="w-3 h-3"/> {isRtl ? 'في الانتظار' : 'Pending'}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 text-sm text-slate-400">
+                    <span className="flex items-center gap-1"><MapPin className="w-4 h-4"/> {lead.location}</span>
+                    <span className="flex items-center gap-1 text-emerald-400"><Mail className="w-4 h-4"/> {lead.email}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                  <button 
+                    onClick={() => handleWhatsApp(lead.phone, lead.company_name)}
+                    className="flex-1 md:flex-none bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 px-4 py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-colors">
+                    <MessageCircle className="w-5 h-5" />
+                    <span>{isRtl ? 'واتساب' : 'WhatsApp'}</span>
+                  </button>
+                  
+                  <button 
+                    onClick={() => handleSendEmail(lead)}
+                    disabled={sendingId === lead.id || lead.email === 'No Email'}
+                    className={`flex-1 md:flex-none px-6 py-3 rounded-xl flex items-center justify-center gap-2 font-bold transition-all ${
+                      sendingId === lead.id ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 
+                      lead.status === 'contacted' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' :
+                      lead.email === 'No Email' ? 'bg-slate-800 text-slate-500 cursor-not-allowed' :
+                      'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20'
+                    }`}>
+                    {sendingId === lead.id ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      <Send className="w-5 h-5" />
+                    )}
+                    <span>
+                      {sendingId === lead.id ? (isRtl ? 'جاري الإرسال...' : 'Sending...') : 
+                       lead.status === 'contacted' ? (isRtl ? 'إعادة الإرسال' : 'Resend Email') :
+                       (isRtl ? 'إرسال المقترح' : 'Send Proposal')}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            ))
           )}
         </div>
       </main>
