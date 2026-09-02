@@ -43,6 +43,22 @@ export default function DashboardPage() {
     setLoading(true); 
     setResults(null);
 
+    // 1. تسجيل الحملة في قاعدة البيانات ليعمل الطيار الآلي عليها لاحقاً
+    try {
+      const { error: campaignError } = await supabase.from('active_campaigns').insert([{
+        user_id: user.id,
+        product_url: targetUrl,
+        target_market: targetMarket || "Global",
+        supplier_email: supplierEmail,
+        supplier_phone: supplierPhone || "N/A",
+        status: 'active'
+      }]);
+      if (campaignError) console.error("Database save campaign error:", campaignError);
+    } catch (err) {
+      console.error("Failed to save campaign to Supabase", err);
+    }
+
+    // 2. تشغيل الصيد الفوري (الدفعة الأولى) لعرضها للمستخدم فوراً
     try {
       const response = await fetch("/api/generate-leads", {
         method: "POST",
@@ -61,7 +77,7 @@ export default function DashboardPage() {
       if (response.ok && actualData && actualData.leads) {
         setResults({ leads: actualData.leads });
         
-        // --- سد الثغرة: حفظ العملاء في قاعدة البيانات فور اصطيادهم ---
+        // 3. حفظ العملاء الذين تم اصطيادهم في الـ CRM
         try {
           const leadsToSave = actualData.leads.map((lead: any) => ({
             user_id: user.id,
@@ -73,11 +89,10 @@ export default function DashboardPage() {
           }));
           
           const { error: dbError } = await supabase.from('rfq_leads').insert(leadsToSave);
-          if (dbError) console.error("Database save error:", dbError);
+          if (dbError) console.error("Database save leads error:", dbError);
         } catch (dbErr) {
-          console.error("Failed to save to Supabase", dbErr);
+          console.error("Failed to save leads to Supabase", dbErr);
         }
-        // -------------------------------------------------------------
 
       } else {
         setResults({ error: actualData.error || responseData.error || "فشل في جلب البيانات من السيرفر." });
@@ -133,7 +148,7 @@ export default function DashboardPage() {
       <main className="flex-1 overflow-y-auto p-8 max-w-6xl mx-auto">
         <div className="mb-10">
           <h3 className="text-3xl font-bold text-white mb-2">{isRtl ? 'استكشاف الأسواق العالمية' : 'Global Market Hunter'}</h3>
-          <p className="text-slate-400">{isRtl ? 'أدخل بياناتك ورابط منتجك ليقوم الذكاء الاصطناعي بالبحث والمراسلة وحفظ العملاء نيابة عنك.' : 'Enter your details and product URL to let AI hunt and save leads.'}</p>
+          <p className="text-slate-400">{isRtl ? 'أدخل بياناتك وسيتم تسجيل حملتك برمجياً ليعمل الطيار الآلي على جلب العملاء نيابة عنك.' : 'Enter your details. Your campaign will be saved for automated daily hunting.'}</p>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl mb-8">
@@ -156,7 +171,7 @@ export default function DashboardPage() {
             </div>
           </div>
           <button onClick={handleStartHunt} disabled={loading || !targetUrl || !supplierEmail} className={`w-full rounded-xl px-6 py-4 font-bold text-white flex justify-center gap-2 ${loading ? 'bg-slate-700' : 'bg-blue-600 hover:bg-blue-500'}`}>
-            <Zap className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} /> {loading ? (isRtl ? 'جاري الصيد والمراسلة الحية...' : 'Hunting & Outreaching...') : (isRtl ? 'بدء الصيد الشامل' : 'Start Global Hunt')}
+            <Zap className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} /> {loading ? (isRtl ? 'جاري الصيد وتسجيل الحملة...' : 'Hunting & Saving Campaign...') : (isRtl ? 'بدء الصيد وتفعيل الطيار الآلي' : 'Start Hunt & Activate Autopilot')}
           </button>
         </div>
 
@@ -169,7 +184,7 @@ export default function DashboardPage() {
 
         {results && results.leads && (
           <div className="space-y-6">
-            <h4 className="text-xl font-bold text-emerald-400">{isRtl ? 'العملاء المكتشفون (تم الحفظ بنجاح):' : 'Discovered Leads (Saved):'}</h4>
+            <h4 className="text-xl font-bold text-emerald-400">{isRtl ? 'تم تفعيل الحملة! العملاء المكتشفون:' : 'Campaign Activated! Discovered Leads:'}</h4>
             {results.leads.map((lead: any, idx: number) => (
               <div key={idx} className="bg-slate-900 border border-slate-700 rounded-2xl p-6 flex flex-col lg:flex-row gap-6 shadow-lg">
                 <div className="lg:w-1/3 space-y-3">
