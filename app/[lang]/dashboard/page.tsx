@@ -3,215 +3,179 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, Target, Mail, Zap, MessageCircle, MapPin, Phone, LogOut, Home, Briefcase } from "lucide-react";
+import { LayoutDashboard, Zap, Search, Loader2, ArrowLeft, Target, Briefcase, Plus, X } from "lucide-react";
 
-export default function DashboardPage() {
+export default function Dashboard() {
   const router = useRouter();
   const params = useParams();
-  const currentLangCode = (params?.lang as string) || "ar";
-  const isRtl = currentLangCode === 'ar';
+  const lang = (params?.lang as string) || "ar";
+  const isRtl = lang === "ar";
 
   const [user, setUser] = useState<any>(null);
-  const [targetUrl, setTargetUrl] = useState("");
+  const [productUrl, setProductUrl] = useState("");
   const [targetMarket, setTargetMarket] = useState("");
-  const [supplierEmail, setSupplierEmail] = useState("");
   const [supplierPhone, setSupplierPhone] = useState("");
+  const [supplierEmail, setSupplierEmail] = useState("");
+  
+  const [step, setStep] = useState(1); // 1 = Input, 2 = Keywords Review
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<any>(null);
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [newKeyword, setNewKeyword] = useState("");
 
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) router.push(`/${currentLangCode}/login`);
+      if (!session) router.push(`/${lang}/login`);
       else {
         setUser(session.user);
-        setSupplierEmail(session.user.email || "");
+        setSupplierEmail(session.user.email);
       }
     };
     checkUser();
-  }, [router, currentLangCode]);
+  }, [router, lang]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push(`/${currentLangCode}/login`);
+  const handleAnalyze = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!productUrl) return alert(isRtl ? "أدخل رابط المنتج" : "Enter product link");
+    setLoading(true);
+    try {
+      const res = await fetch("http://178.105.30.59:8000/api/analyze-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_url: productUrl, target_market: targetMarket || "Global" })
+      });
+      const data = await res.json();
+      if (data.keywords) {
+        setKeywords(data.keywords);
+        setStep(2);
+      }
+    } catch (err) {
+      alert("Error analyzing URL");
+    }
+    setLoading(false);
   };
 
-  const handleStartHunt = async () => {
-    if (!targetUrl.includes("http")) return alert(isRtl ? "يرجى إدخال رابط صحيح" : "Please enter a valid URL");
-    if (!supplierEmail) return alert(isRtl ? "البريد الإلكتروني مطلوب لاستقبال الردود" : "Email is required for RFQs");
+  const handleHunt = async () => {
+    if (keywords.length === 0) return alert(isRtl ? "أضف كلمة مفتاحية واحدة على الأقل" : "Add at least one keyword");
+    setLoading(true);
     
-    setLoading(true); 
-    setResults(null);
-
-    // 1. تسجيل الحملة في قاعدة البيانات ليعمل الطيار الآلي عليها لاحقاً
+    const searchQuery = `${keywords.join(" OR ")} in ${targetMarket || "Global"}`;
+    
     try {
-      const { error: campaignError } = await supabase.from('active_campaigns').insert([{
-        user_id: user.id,
-        product_url: targetUrl,
-        target_market: targetMarket || "Global",
-        supplier_email: supplierEmail,
-        supplier_phone: supplierPhone || "N/A",
-        status: 'active'
-      }]);
-      if (campaignError) console.error("Database save campaign error:", campaignError);
-    } catch (err) {
-      console.error("Failed to save campaign to Supabase", err);
-    }
-
-    // 2. تشغيل الصيد الفوري (الدفعة الأولى) لعرضها للمستخدم فوراً
-    try {
-      const response = await fetch("/api/generate-leads", {
+      const res = await fetch("http://178.105.30.59:8000/api/generate-leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          product_description: targetUrl,
-          target_market: targetMarket, 
+          search_query: searchQuery,
+          product_description: productUrl,
+          target_market: targetMarket,
           supplier_email: supplierEmail,
           supplier_phone: supplierPhone
-        }),
+        })
       });
-
-      const responseData = await response.json();
-      const actualData = responseData.data || responseData;
-
-      if (response.ok && actualData && actualData.leads) {
-        setResults({ leads: actualData.leads });
-        
-        // 3. حفظ العملاء الذين تم اصطيادهم في الـ CRM
-        try {
-          const leadsToSave = actualData.leads.map((lead: any) => ({
+      
+      const data = await res.json();
+      if (res.ok && data.data?.leads) {
+        // حفظ الصفقات في قاعدة البيانات
+        for (const lead of data.data.leads) {
+          await supabase.from("rfq_leads").insert({
             user_id: user.id,
-            company_name: lead.company_name || 'Unknown',
-            location: lead.location || 'Unknown',
-            email: lead.company_email || 'No Email',
-            phone: lead.phone_number || 'No Phone',
+            company_name: lead.company_name,
+            email: lead.company_email,
+            phone: lead.phone_number,
+            location: lead.location,
+            website: lead.website_url,
             status: 'pending'
-          }));
-          
-          const { error: dbError } = await supabase.from('rfq_leads').insert(leadsToSave);
-          if (dbError) console.error("Database save leads error:", dbError);
-        } catch (dbErr) {
-          console.error("Failed to save leads to Supabase", dbErr);
+          });
         }
-
+        // الانتقال التلقائي للـ CRM
+        router.push(`/${lang}/crm`);
       } else {
-        setResults({ error: actualData.error || responseData.error || "فشل في جلب البيانات من السيرفر." });
+        alert(data.error || "Hunt failed");
+        setLoading(false);
       }
-    } catch (error: any) {
-      setResults({ error: error.message || "حدث خطأ غير متوقع في الشبكة" });
-    } finally {
+    } catch (err) {
+      alert("Server connection error");
       setLoading(false);
     }
   };
 
-  const handleWhatsApp = (phone: string, message: string) => {
-    if (!phone || phone === "N/A") return alert("Phone not available");
-    const cleanPhone = phone.replace(/\D/g, '');
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+  const addKeyword = () => {
+    if (newKeyword.trim() && !keywords.includes(newKeyword.trim())) {
+      setKeywords([...keywords, newKeyword.trim()]);
+      setNewKeyword("");
+    }
   };
 
-  if (!user) return <div className="min-h-screen bg-slate-950 flex justify-center items-center"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div></div>;
-
   return (
-    <div className={`flex h-screen bg-slate-950 text-slate-200 font-sans ${isRtl ? 'dir-rtl' : 'dir-ltr'}`} dir={isRtl ? 'rtl' : 'ltr'}>
-      <aside className="w-64 bg-slate-900 border-x border-slate-800 flex flex-col hidden md:flex shrink-0">
-        <div className="h-20 flex items-center px-6 border-b border-slate-800">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white text-sm">E</div>
-            <h1 className="text-xl font-bold text-white">Expora</h1>
-          </div>
-        </div>
-        <nav className="flex-1 py-6 px-4 space-y-2">
-          <button onClick={() => router.push(`/${currentLangCode}`)} className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 hover:text-white rounded-xl font-medium">
-            <Home className="w-5 h-5" /> {isRtl ? 'الصفحة الرئيسية' : 'Home'}
-          </button>
-          
-          <button className="w-full flex items-center gap-3 px-4 py-3 bg-blue-600/10 text-blue-400 rounded-xl font-medium border border-blue-500/25">
-            <LayoutDashboard className="w-5 h-5" /> {isRtl ? 'الصيد الجديد' : 'New Hunt'}
-          </button>
+    <div className={`min-h-screen bg-slate-950 text-slate-200 font-sans flex flex-col items-center pt-20 px-4 ${isRtl ? 'dir-rtl' : 'dir-ltr'}`} dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="max-w-3xl w-full text-center mb-10">
+        <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">{isRtl ? 'استكشاف الأسواق العالمية' : 'Global Market Exploration'}</h2>
+        <p className="text-slate-400">{isRtl ? 'سيقوم الذكاء الاصطناعي بتحليل منتجك، استنتاج الكلمات المفتاحية، وجلب العملاء لك.' : 'AI will analyze your product, extract keywords, and hunt clients.'}</p>
+      </div>
 
-          <button onClick={() => router.push(`/${currentLangCode}/crm`)} className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 hover:text-white rounded-xl font-medium">
-            <Briefcase className="w-5 h-5" /> {isRtl ? 'إدارة الصفقات (CRM)' : 'Deals & RFQs'}
-          </button>
-
-          <button onClick={() => router.push(`/${currentLangCode}/pricing`)} className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800/50 hover:text-white rounded-xl font-medium">
-            <Target className="w-5 h-5" /> {isRtl ? 'الباقات والاشتراك' : 'Pricing'}
-          </button>
-        </nav>
-        <div className="p-4 border-t border-slate-800">
-          <button onClick={handleLogout} className="w-full flex justify-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg">
-            <LogOut className="w-4 h-4" /> {isRtl ? 'تسجيل الخروج' : 'Logout'}
-          </button>
-        </div>
-      </aside>
-
-      <main className="flex-1 overflow-y-auto p-8 max-w-6xl mx-auto">
-        <div className="mb-10">
-          <h3 className="text-3xl font-bold text-white mb-2">{isRtl ? 'استكشاف الأسواق العالمية' : 'Global Market Hunter'}</h3>
-          <p className="text-slate-400">{isRtl ? 'أدخل بياناتك وسيتم تسجيل حملتك برمجياً ليعمل الطيار الآلي على جلب العملاء نيابة عنك.' : 'Enter your details. Your campaign will be saved for automated daily hunting.'}</p>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl mb-8">
-          <div className="grid md:grid-cols-2 gap-6 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">{isRtl ? 'رابط منتجك' : 'Product URL'}</label>
-              <input type="url" value={targetUrl} onChange={(e) => setTargetUrl(e.target.value)} placeholder="https://..." className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-white focus:border-blue-500 outline-none" disabled={loading} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">{isRtl ? 'السوق المستهدف (اختياري)' : 'Target Market (Optional)'}</label>
-              <input type="text" value={targetMarket} onChange={(e) => setTargetMarket(e.target.value)} placeholder={isRtl ? 'اتركه فارغاً للاستنتاج التلقائي...' : 'Leave empty for auto-detect...'} className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-white focus:border-blue-500 outline-none" disabled={loading} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2"><Mail className="w-4 h-4"/> {isRtl ? 'بريد استقبال الردود (RFQ)' : 'RFQ Reply Email'}</label>
-              <input type="email" value={supplierEmail} onChange={(e) => setSupplierEmail(e.target.value)} className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-white focus:border-blue-500 outline-none" disabled={loading} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2"><Phone className="w-4 h-4"/> {isRtl ? 'رقم واتساب المورد (اختياري)' : 'Supplier WhatsApp (Optional)'}</label>
-              <input type="text" value={supplierPhone} onChange={(e) => setSupplierPhone(e.target.value)} placeholder="+1234567890" className="w-full rounded-xl border border-slate-700 bg-slate-800/50 p-4 text-white focus:border-blue-500 outline-none" disabled={loading} />
-            </div>
-          </div>
-          <button onClick={handleStartHunt} disabled={loading || !targetUrl || !supplierEmail} className={`w-full rounded-xl px-6 py-4 font-bold text-white flex justify-center gap-2 ${loading ? 'bg-slate-700' : 'bg-blue-600 hover:bg-blue-500'}`}>
-            <Zap className={`w-5 h-5 ${loading ? 'animate-pulse' : ''}`} /> {loading ? (isRtl ? 'جاري الصيد وتسجيل الحملة...' : 'Hunting & Saving Campaign...') : (isRtl ? 'بدء الصيد وتفعيل الطيار الآلي' : 'Start Hunt & Activate Autopilot')}
-          </button>
-        </div>
-
-        {results && results.error && (
-          <div className="bg-red-950/40 border border-red-900 rounded-2xl p-6 mb-8 text-red-400">
-            <h4 className="font-bold text-lg text-red-500">{isRtl ? 'تنبيه' : 'Notice'}</h4>
-            <p className="text-sm">{results.error}</p>
-          </div>
-        )}
-
-        {results && results.leads && (
-          <div className="space-y-6">
-            <h4 className="text-xl font-bold text-emerald-400">{isRtl ? 'تم تفعيل الحملة! العملاء المكتشفون:' : 'Campaign Activated! Discovered Leads:'}</h4>
-            {results.leads.map((lead: any, idx: number) => (
-              <div key={idx} className="bg-slate-900 border border-slate-700 rounded-2xl p-6 flex flex-col lg:flex-row gap-6 shadow-lg">
-                <div className="lg:w-1/3 space-y-3">
-                  <h5 className="text-xl font-bold text-white">{lead.company_name}</h5>
-                  <div className="flex items-start gap-2 text-slate-400 text-sm"><MapPin className="w-4 h-4 shrink-0 text-red-400" /> <span>{lead.location}</span></div>
-                  <div className="flex items-center gap-2 text-slate-400 text-sm"><Phone className="w-4 h-4 text-emerald-400" /> <span dir="ltr">{lead.phone_number}</span></div>
-                </div>
-                <div className="lg:w-2/3 flex flex-col gap-4">
-                  <div className="bg-emerald-950/20 border border-emerald-900/50 rounded-xl p-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-bold text-emerald-400 flex items-center gap-2"><MessageCircle className="w-4 h-4"/> WhatsApp مسودة</span>
-                      <button onClick={() => handleWhatsApp(lead.phone_number, lead.drafted_whatsapp)} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4 py-2 rounded-lg flex items-center gap-2">
-                        إرسال واتساب <MessageCircle className="w-3 h-3"/>
-                      </button>
-                    </div>
-                    <p className="text-sm text-slate-300 whitespace-pre-wrap">{lead.drafted_whatsapp}</p>
-                  </div>
-                  <div className="bg-blue-950/20 border border-blue-900/50 rounded-xl p-4">
-                    <span className="text-sm font-bold text-blue-400 flex items-center gap-2 mb-2"><Mail className="w-4 h-4"/> مسودة البريد (جاهزة للإرسال التلقائي عبر الدومين الموثق)</span>
-                    <pre className="text-xs text-slate-300 whitespace-pre-wrap font-sans">{lead.drafted_email}</pre>
-                  </div>
-                </div>
+      <div className="max-w-3xl w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
+        {step === 1 ? (
+          <form onSubmit={handleAnalyze} className="space-y-6">
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-2">{isRtl ? 'رابط منتجك' : 'Product Link'}</label>
+                <input required type="url" value={productUrl} onChange={(e)=>setProductUrl(e.target.value)} placeholder="https://your-product.com" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:border-blue-500 outline-none" />
               </div>
-            ))}
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-2">{isRtl ? 'السوق المستهدف' : 'Target Market'}</label>
+                <input type="text" value={targetMarket} onChange={(e)=>setTargetMarket(e.target.value)} placeholder={isRtl ? "مثال: السعودية, تركيا..." : "e.g., Saudi Arabia, UK"} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:border-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-2">{isRtl ? 'بريد استقبال الردود' : 'Reply Email'}</label>
+                <input type="email" value={supplierEmail} onChange={(e)=>setSupplierEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:border-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-2">{isRtl ? 'رقم واتساب للتواصل' : 'WhatsApp Number'}</label>
+                <input type="text" value={supplierPhone} onChange={(e)=>setSupplierPhone(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:border-blue-500 outline-none" />
+              </div>
+            </div>
+            
+            <button disabled={loading} type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-500/20 disabled:bg-slate-700">
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+              {loading ? (isRtl ? 'جاري تحليل الموقع...' : 'Analyzing Website...') : (isRtl ? 'تحليل المنتج واستخراج الكلمات' : 'Analyze Product & Extract Keywords')}
+            </button>
+          </form>
+        ) : (
+          <div className="space-y-8 animate-in fade-in zoom-in duration-300">
+            <div className="text-center">
+              <div className="inline-flex p-3 bg-emerald-500/10 text-emerald-400 rounded-full mb-4"><Zap className="w-8 h-8" /></div>
+              <h3 className="text-xl font-bold text-white mb-2">{isRtl ? 'تم تحليل موقعك بنجاح' : 'Website Analyzed Successfully'}</h3>
+              <p className="text-sm text-slate-400">{isRtl ? 'استنتج الذكاء الاصطناعي هذه الكلمات المفتاحية للبحث عن المشترين. راجعها وعدلها إن شئت.' : 'AI extracted these B2B keywords. Review and edit them.'}</p>
+            </div>
+
+            <div className="bg-slate-950 border border-slate-800 p-6 rounded-2xl">
+              <div className="flex flex-wrap gap-3 mb-6">
+                {keywords.map((kw, i) => (
+                  <span key={i} className="flex items-center gap-2 bg-blue-600/10 border border-blue-500/30 text-blue-400 px-4 py-2 rounded-lg text-sm font-medium">
+                    {kw}
+                    <button onClick={() => setKeywords(keywords.filter((_, idx) => idx !== i))} className="hover:text-red-400"><X className="w-4 h-4" /></button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input type="text" value={newKeyword} onChange={(e)=>setNewKeyword(e.target.value)} onKeyDown={(e)=>e.key === 'Enter' && addKeyword()} placeholder={isRtl ? "إضافة كلمة مفتاحية أخرى..." : "Add another keyword..."} className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm focus:border-blue-500 outline-none" />
+                <button onClick={addKeyword} className="bg-slate-800 hover:bg-slate-700 p-3 rounded-xl"><Plus className="w-4 h-4 text-white" /></button>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <button onClick={() => setStep(1)} className="px-6 py-4 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-medium flex items-center gap-2">
+                <ArrowLeft className={`w-4 h-4 ${isRtl ? 'rotate-180' : ''}`} /> {isRtl ? 'رجوع' : 'Back'}
+              </button>
+              <button disabled={loading} onClick={handleHunt} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20 disabled:bg-slate-700">
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Target className="w-5 h-5" />}
+                {loading ? (isRtl ? 'جاري صيد العملاء...' : 'Hunting Clients...') : (isRtl ? 'اعتماد وبدء الصيد' : 'Confirm & Start Hunt')}
+              </button>
+            </div>
           </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }
