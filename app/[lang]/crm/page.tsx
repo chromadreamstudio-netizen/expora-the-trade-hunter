@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, Mail, MessageCircle, MapPin, Phone, CheckCircle, Clock, Send, Home, Briefcase, LogOut } from "lucide-react";
+import { LayoutDashboard, Mail, MessageCircle, MapPin, CheckCircle, Clock, Send, Home, Briefcase, LogOut } from "lucide-react";
 
 export default function CRMPage() {
   const router = useRouter();

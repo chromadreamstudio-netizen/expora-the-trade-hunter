@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
-import { Globe, Target, Zap, ChevronDown, ArrowRight, ShieldCheck, Users, MessageCircle, Briefcase } from "lucide-react";
+import { Globe, Target, Zap, ChevronDown, ArrowRight, MessageCircle, Briefcase } from "lucide-react";
 
 export default function LandingPage() {
   const params = useParams();
