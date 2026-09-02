@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, Mail, MessageCircle, MapPin, CheckCircle, Clock, Send, Home, Briefcase, LogOut } from "lucide-react";
+import { LayoutDashboard, Mail, MessageCircle, MapPin, CheckCircle, Clock, Send, Home, Briefcase, LogOut, X, Edit3 } from "lucide-react";
 
 export default function CRMPage() {
   const router = useRouter();
@@ -16,6 +16,11 @@ export default function CRMPage() {
   const [loading, setLoading] = useState(true);
   const [sendingId, setSendingId] = useState<number | null>(null);
 
+  // حالة النافذة المنبثقة (Modal) للمراجعة والتعديل
+  const [activeModalLead, setActiveModalLead] = useState<any | null>(null);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+
   useEffect(() => {
     const fetchLeads = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -25,8 +30,7 @@ export default function CRMPage() {
       }
       setUser(session.user);
 
-      // جلب الصفقات الخاصة بالمورد فقط
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('rfq_leads')
         .select('*')
         .eq('user_id', session.user.id)
@@ -44,53 +48,77 @@ export default function CRMPage() {
     router.push(`/${currentLangCode}/login`);
   };
 
-  const handleSendEmail = async (lead: any) => {
-    setSendingId(lead.id);
-    
-    const subject = "Exclusive Partnership Opportunity";
-    const body = `Dear Purchasing Team at ${lead.company_name},\n\nWe are currently restructuring our supply chain for your region and looking for an exclusive distribution partner. Are you open to a quick 10-minute Zoom call next week?\n\nBest regards,\nExpora Supplier`;
+  // فتح نافذة المراجعة وتجهيز المسودة
+  const openReviewModal = (lead: any) => {
+    setActiveModalLead(lead);
+    setEmailSubject(`Exclusive Distribution Partnership - ${lead.company_name}`);
+    setEmailBody(
+`Dear Purchasing Director at ${lead.company_name},
+
+We are currently restructuring our international supply chain and selecting one exclusive distribution partner in your region for our manufacturing line.
+
+Based on your current operations, we see strong synergy. Would you be open to a brief 10-minute introductory Zoom call next week to discuss terms and exclusive pricing?
+
+Best regards,
+Business Development Team`
+    );
+  };
+
+  // تأكيد الإرسال الفعلي بعد مراجعة المورد
+  const handleConfirmSend = async () => {
+    if (!activeModalLead) return;
+    setSendingId(activeModalLead.id);
 
     try {
-      const response = await fetch("http://178.105.30.59:8000/api/send-email", {
+      const response = await fetch("/api/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          to_email: lead.email,
-          subject: subject,
-          body: body,
-          reply_to: user.email
+          to_email: activeModalLead.email,
+          subject: emailSubject,
+          body: emailBody,
+          reply_to: user?.email || "deal@kian.business"
         }),
       });
 
       if (response.ok) {
-        // تحديث حالة الصفقة في قاعدة البيانات إلى "تم الإرسال"
-        await supabase.from('rfq_leads').update({ status: 'contacted' }).eq('id', lead.id);
-        
-        // تحديث الواجهة
-        setLeads(leads.map(l => l.id === lead.id ? { ...l, status: 'contacted' } : l));
-        alert(isRtl ? "تم إرسال مقترح الشراكة بنجاح!" : "Partnership proposal sent successfully!");
+        await supabase.from('rfq_leads').update({ status: 'contacted' }).eq('id', activeModalLead.id);
+        setLeads(leads.map(l => l.id === activeModalLead.id ? { ...l, status: 'contacted' } : l));
+        setActiveModalLead(null);
+        alert(isRtl ? "تم إرسال المقترح بنجاح!" : "Proposal sent successfully!");
       } else {
-        alert("فشل في إرسال الإيميل. تأكد من السيرفر.");
+        const err = await response.json();
+        alert(err.error || "فشل في إرسال الإيميل. تأكد من إعدادات السيرفر.");
       }
     } catch (error) {
       console.error(error);
-      alert("حدث خطأ في الاتصال بالسيرفر.");
+      alert("حدث خطأ أثناء محاولة الإرسال.");
     } finally {
       setSendingId(null);
     }
   };
 
   const handleWhatsApp = (phone: string, companyName: string) => {
-    if (!phone || phone === "N/A" || phone === "No Phone") return alert("Phone not available");
+    if (!phone || phone === "N/A" || phone === "No Phone") {
+      alert(isRtl ? "رقم الهاتف غير متوفر لهذه الشركة" : "Phone number not available");
+      return;
+    }
     const cleanPhone = phone.replace(/\D/g, '');
-    const message = `Hello ${companyName} team, we are looking for an exclusive distribution partner in your market. Are you open to a quick 10-min introductory call next week?`;
+    const message = `Hello ${companyName} team, we are selecting an exclusive distribution partner in your market. Are you open to a quick 10-min introductory call next week?`;
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  if (loading) return <div className="min-h-screen bg-slate-950 flex justify-center items-center"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div></div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex justify-center items-center">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex h-screen bg-slate-950 text-slate-200 font-sans ${isRtl ? 'dir-rtl' : 'dir-ltr'}`} dir={isRtl ? 'rtl' : 'ltr'}>
+      {/* القائمة الجانبية */}
       <aside className="w-64 bg-slate-900 border-x border-slate-800 flex flex-col hidden md:flex shrink-0">
         <div className="h-20 flex items-center px-6 border-b border-slate-800">
           <div className="flex items-center gap-2">
@@ -116,11 +144,12 @@ export default function CRMPage() {
         </div>
       </aside>
 
+      {/* المحتوى الرئيسي */}
       <main className="flex-1 overflow-y-auto p-8 max-w-6xl mx-auto">
         <div className="mb-10 flex justify-between items-end">
           <div>
             <h3 className="text-3xl font-bold text-white mb-2">{isRtl ? 'غرفة العمليات الاستراتيجية (CRM)' : 'Strategic Deal Room'}</h3>
-            <p className="text-slate-400">{isRtl ? 'راجع الفرص المكتشفة، أضف لمستك، وابدأ التفاوض.' : 'Review discovered opportunities and start negotiations.'}</p>
+            <p className="text-slate-400">{isRtl ? 'راجع الفرص المكتشفة، عدّل نص الرسالة، واعتمد الإرسال بيدك.' : 'Review opportunities, edit outreach copy, and dispatch manually.'}</p>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex gap-6">
             <div className="text-center">
@@ -166,24 +195,15 @@ export default function CRMPage() {
                   </button>
                   
                   <button 
-                    onClick={() => handleSendEmail(lead)}
-                    disabled={sendingId === lead.id || lead.email === 'No Email'}
+                    onClick={() => openReviewModal(lead)}
+                    disabled={lead.email === 'No Email'}
                     className={`flex-1 md:flex-none px-6 py-3 rounded-xl flex items-center justify-center gap-2 font-bold transition-all ${
-                      sendingId === lead.id ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 
                       lead.status === 'contacted' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' :
                       lead.email === 'No Email' ? 'bg-slate-800 text-slate-500 cursor-not-allowed' :
                       'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20'
                     }`}>
-                    {sendingId === lead.id ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    ) : (
-                      <Send className="w-5 h-5" />
-                    )}
-                    <span>
-                      {sendingId === lead.id ? (isRtl ? 'جاري الإرسال...' : 'Sending...') : 
-                       lead.status === 'contacted' ? (isRtl ? 'إعادة الإرسال' : 'Resend Email') :
-                       (isRtl ? 'إرسال المقترح' : 'Send Proposal')}
-                    </span>
+                    <Edit3 className="w-5 h-5" />
+                    <span>{lead.status === 'contacted' ? (isRtl ? 'إعادة المراجعة والإرسال' : 'Review & Resend') : (isRtl ? 'مراجعة وإرسال المقترح' : 'Review & Send')}</span>
                   </button>
                 </div>
               </div>
@@ -191,6 +211,68 @@ export default function CRMPage() {
           )}
         </div>
       </main>
+
+      {/* نافذة مراجعة وتعديل الإيميل المنبثقة (Review Modal) */}
+      {activeModalLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-slate-800 bg-slate-950/40">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-500/10 text-blue-400 rounded-lg"><Mail className="w-5 h-5" /></div>
+                <div>
+                  <h4 className="text-lg font-bold text-white">{isRtl ? 'مراجعة مقترح الشراكة الحصرية' : 'Review Exclusive Proposal'}</h4>
+                  <p className="text-xs text-slate-400">{isRtl ? 'المرسل إليه:' : 'Recipient:'} {activeModalLead.email}</p>
+                </div>
+              </div>
+              <button onClick={() => setActiveModalLead(null)} className="text-slate-400 hover:text-white p-2">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-2">{isRtl ? 'عنوان الرسالة (Subject)' : 'Subject'}</label>
+                <input 
+                  type="text" 
+                  value={emailSubject} 
+                  onChange={(e) => setEmailSubject(e.target.value)} 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-2">{isRtl ? 'نص الرسالة (يمكنك التعديل عليها بحرية)' : 'Email Body'}</label>
+                <textarea 
+                  rows={8} 
+                  value={emailBody} 
+                  onChange={(e) => setEmailBody(e.target.value)} 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-sm leading-relaxed focus:outline-none focus:border-blue-500 resize-none" 
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-slate-800 bg-slate-950/40 flex justify-end gap-3">
+              <button 
+                onClick={() => setActiveModalLead(null)} 
+                className="px-5 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-medium text-sm">
+                {isRtl ? 'إلغاء' : 'Cancel'}
+              </button>
+              
+              <button 
+                onClick={handleConfirmSend}
+                disabled={sendingId === activeModalLead.id}
+                className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 text-sm shadow-lg shadow-blue-500/20 disabled:bg-slate-700">
+                {sendingId === activeModalLead.id ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                <span>{sendingId === activeModalLead.id ? (isRtl ? 'جاري الإرسال المعتمد...' : 'Sending...') : (isRtl ? 'اعتماد وإرسال الآن' : 'Confirm & Send')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
