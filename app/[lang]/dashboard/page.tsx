@@ -39,7 +39,7 @@ export default function Dashboard() {
     if (!productUrl) return alert(isRtl ? "أدخل رابط المنتج" : "Enter product link");
     setLoading(true);
     try {
-      const res = await fetch("http://178.105.30.59:8000/api/analyze-url", {
+      const res = await fetch("/api/analyze-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ product_url: productUrl, target_market: targetMarket || "Global" })
@@ -62,7 +62,7 @@ export default function Dashboard() {
     const searchQuery = `${keywords.join(" OR ")} in ${targetMarket || "Global"}`;
     
     try {
-      const res = await fetch("http://178.105.30.59:8000/api/generate-leads", {
+      const res = await fetch("/api/generate-leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
