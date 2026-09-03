@@ -47,16 +47,27 @@ export default function CRMPage() {
     router.push(`/${currentLangCode}/login`);
   };
 
-  // ربط النافذة المنبثقة بالإيميل القادم من السيرفر الذكي
   const openReviewModal = (lead: any) => {
     setActiveModalLead(lead);
     
-    // تنظيف اسم الشركة من رموز الداشبورد ليكون عنوان الإيميل احترافياً
+    // تنظيف اسم الشركة من رموز الداشبورد
     const cleanName = lead.company_name.replace(/🏢 /g, '').replace(/🎯.*\| /g, '').trim();
     
-    setEmailSubject(`Exclusive Distribution Partnership - ${cleanName}`);
-    // سحب نص الإيميل الاستخباراتي مباشرة من قاعدة البيانات
-    setEmailBody(lead.drafted_email || "");
+    // سحب النص الكامل القادم من السيرفر
+    const fullText = lead.drafted_email || "";
+    
+    let finalSubject = `Exclusive Distribution Partnership - ${cleanName}`;
+    let finalBody = fullText;
+
+    // فصل العنوان عن نص الرسالة بذكاء
+    if (fullText.startsWith("Subject:")) {
+      const parts = fullText.split('\n\n');
+      finalSubject = parts[0].replace('Subject:', '').trim(); 
+      finalBody = parts.slice(1).join('\n\n').trim(); 
+    }
+    
+    setEmailSubject(finalSubject);
+    setEmailBody(finalBody);
   };
 
   const handleConfirmSend = async () => {
@@ -92,7 +103,6 @@ export default function CRMPage() {
     }
   };
 
-  // تمرير نص الواتساب المجهز من السيرفر بدلاً من النص الثابت
   const handleWhatsApp = (phone: string, draftedMessage: string) => {
     if (!phone || phone === "N/A" || phone === "No Phone") {
       alert(isRtl ? "رقم الهاتف غير متوفر لهذه الشركة" : "Phone number not available");
