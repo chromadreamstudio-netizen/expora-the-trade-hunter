@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, Mail, MessageCircle, MapPin, CheckCircle, Clock, Send, Home, Briefcase, LogOut, X, Globe } from "lucide-react";
+import { LayoutDashboard, Mail, MessageCircle, MapPin, CheckCircle, Clock, Send, Home, Briefcase, LogOut, X, Edit3 } from "lucide-react";
 
 export default function CRMPage() {
   const router = useRouter();
@@ -24,21 +24,26 @@ export default function CRMPage() {
 
   useEffect(() => {
     const fetchLeads = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push(`/${currentLangCode}/login`);
-        return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          router.push(`/${currentLangCode}/login`);
+          return;
+        }
+        setUser(session.user);
+
+        const { data } = await supabase
+          .from('rfq_leads')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: false });
+
+        if (data) setLeads(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
       }
-      setUser(session.user);
-
-      const { data } = await supabase
-        .from('rfq_leads')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false });
-
-      if (data) setLeads(data);
-      setLoading(false);
     };
 
     fetchLeads();
@@ -50,7 +55,8 @@ export default function CRMPage() {
   };
 
   const switchLanguage = (newLang: string) => {
-    const newPath = pathname.replace(`/${currentLangCode}`, `/${newLang}`);
+    const safePathname = pathname || `/${currentLangCode}/crm`;
+    const newPath = safePathname.replace(`/${currentLangCode}`, `/${newLang}`);
     setLangMenuOpen(false);
     router.push(newPath);
   };
@@ -58,12 +64,14 @@ export default function CRMPage() {
   const openReviewModal = (lead: any) => {
     setActiveModalLead(lead);
     
-    const cleanName = lead.company_name.replace(/🏢 /g, '').replace(/🎯.*\| /g, '').trim();
+    // تنظيف اسم الشركة
+    const cleanName = (lead.company_name || "").replace(/🏢 /g, '').replace(/🎯.*\| /g, '').trim();
     const fullText = lead.drafted_email || "";
     
     let finalSubject = `Exclusive Distribution Partnership - ${cleanName}`;
     let finalBody = fullText;
 
+    // فصل العنوان عن نص الرسالة بذكاء
     if (fullText.startsWith("Subject:")) {
       const parts = fullText.split('\n\n');
       finalSubject = parts[0].replace('Subject:', '').trim(); 
@@ -153,7 +161,8 @@ export default function CRMPage() {
               className="w-full flex justify-between items-center px-4 py-2 text-sm text-slate-300 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
             >
               <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4 text-slate-400" />
+                {/* SVG صلب بديل لأيقونة Globe لمنع انهيار الصفحة */}
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 <span>{currentLangCode === 'ar' ? 'العربية' : currentLangCode === 'tr' ? 'Türkçe' : 'English'}</span>
               </div>
             </button>
@@ -239,6 +248,7 @@ export default function CRMPage() {
         </div>
       </main>
 
+      {/* نافذة Outlook الاحترافية */}
       {activeModalLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-slate-50 border border-slate-200 rounded-lg w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col h-[85vh]">
