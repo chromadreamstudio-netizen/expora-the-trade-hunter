@@ -16,7 +16,6 @@ export default function CRMPage() {
   const [loading, setLoading] = useState(true);
   const [sendingId, setSendingId] = useState<number | null>(null);
 
-  // حالة النافذة المنبثقة (Modal) للمراجعة والتعديل
   const [activeModalLead, setActiveModalLead] = useState<any | null>(null);
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
@@ -48,23 +47,18 @@ export default function CRMPage() {
     router.push(`/${currentLangCode}/login`);
   };
 
-  // فتح نافذة المراجعة وتجهيز المسودة
+  // ربط النافذة المنبثقة بالإيميل القادم من السيرفر الذكي
   const openReviewModal = (lead: any) => {
     setActiveModalLead(lead);
-    setEmailSubject(`Exclusive Distribution Partnership - ${lead.company_name}`);
-    setEmailBody(
-`Dear Purchasing Director at ${lead.company_name},
-
-We are currently restructuring our international supply chain and selecting one exclusive distribution partner in your region for our manufacturing line.
-
-Based on your current operations, we see strong synergy. Would you be open to a brief 10-minute introductory Zoom call next week to discuss terms and exclusive pricing?
-
-Best regards,
-Business Development Team`
-    );
+    
+    // تنظيف اسم الشركة من رموز الداشبورد ليكون عنوان الإيميل احترافياً
+    const cleanName = lead.company_name.replace(/🏢 /g, '').replace(/🎯.*\| /g, '').trim();
+    
+    setEmailSubject(`Exclusive Distribution Partnership - ${cleanName}`);
+    // سحب نص الإيميل الاستخباراتي مباشرة من قاعدة البيانات
+    setEmailBody(lead.drafted_email || "");
   };
 
-  // تأكيد الإرسال الفعلي بعد مراجعة المورد
   const handleConfirmSend = async () => {
     if (!activeModalLead) return;
     setSendingId(activeModalLead.id);
@@ -98,13 +92,14 @@ Business Development Team`
     }
   };
 
-  const handleWhatsApp = (phone: string, companyName: string) => {
+  // تمرير نص الواتساب المجهز من السيرفر بدلاً من النص الثابت
+  const handleWhatsApp = (phone: string, draftedMessage: string) => {
     if (!phone || phone === "N/A" || phone === "No Phone") {
       alert(isRtl ? "رقم الهاتف غير متوفر لهذه الشركة" : "Phone number not available");
       return;
     }
     const cleanPhone = phone.replace(/\D/g, '');
-    const message = `Hello ${companyName} team, we are selecting an exclusive distribution partner in your market. Are you open to a quick 10-min introductory call next week?`;
+    const message = draftedMessage || "Hello, we are selecting an exclusive distribution partner in your market. Are you open to a quick 10-min introductory call next week?";
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -118,7 +113,6 @@ Business Development Team`
 
   return (
     <div className={`flex h-screen bg-slate-950 text-slate-200 font-sans ${isRtl ? 'dir-rtl' : 'dir-ltr'}`} dir={isRtl ? 'rtl' : 'ltr'}>
-      {/* القائمة الجانبية */}
       <aside className="w-64 bg-slate-900 border-x border-slate-800 flex flex-col hidden md:flex shrink-0">
         <div className="h-20 flex items-center px-6 border-b border-slate-800">
           <div className="flex items-center gap-2">
@@ -144,7 +138,6 @@ Business Development Team`
         </div>
       </aside>
 
-      {/* المحتوى الرئيسي */}
       <main className="flex-1 overflow-y-auto p-8 max-w-6xl mx-auto">
         <div className="mb-10 flex justify-between items-end">
           <div>
@@ -188,7 +181,7 @@ Business Development Team`
 
                 <div className="flex items-center gap-3 w-full md:w-auto">
                   <button 
-                    onClick={() => handleWhatsApp(lead.phone, lead.company_name)}
+                    onClick={() => handleWhatsApp(lead.phone, lead.drafted_whatsapp)}
                     className="flex-1 md:flex-none bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 px-4 py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-colors">
                     <MessageCircle className="w-5 h-5" />
                     <span>{isRtl ? 'واتساب' : 'WhatsApp'}</span>
@@ -212,7 +205,6 @@ Business Development Team`
         </div>
       </main>
 
-      {/* نافذة مراجعة وتعديل الإيميل المنبثقة (Review Modal) */}
       {activeModalLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl">
@@ -237,6 +229,7 @@ Business Development Team`
                   value={emailSubject} 
                   onChange={(e) => setEmailSubject(e.target.value)} 
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500" 
+                  dir="ltr"
                 />
               </div>
 
@@ -247,6 +240,7 @@ Business Development Team`
                   value={emailBody} 
                   onChange={(e) => setEmailBody(e.target.value)} 
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-sm leading-relaxed focus:outline-none focus:border-blue-500 resize-none" 
+                  dir="ltr"
                 />
               </div>
             </div>
