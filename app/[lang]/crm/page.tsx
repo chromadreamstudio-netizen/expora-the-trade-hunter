@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, Mail, MessageCircle, MapPin, CheckCircle, Clock, Send, Home, Briefcase, LogOut, X, Edit3 } from "lucide-react";
+import { LayoutDashboard, Mail, MessageCircle, MapPin, CheckCircle, Clock, Send, Home, Briefcase, LogOut, X, Edit3, Globe } from "lucide-react";
 
 export default function CRMPage() {
   const router = useRouter();
   const params = useParams();
+  const pathname = usePathname();
   const currentLangCode = (params?.lang as string) || "ar";
   const isRtl = currentLangCode === 'ar';
 
@@ -19,6 +20,7 @@ export default function CRMPage() {
   const [activeModalLead, setActiveModalLead] = useState<any | null>(null);
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
 
   useEffect(() => {
     const fetchLeads = async () => {
@@ -47,13 +49,17 @@ export default function CRMPage() {
     router.push(`/${currentLangCode}/login`);
   };
 
+  const switchLanguage = (newLang: string) => {
+    const newPath = pathname.replace(`/${currentLangCode}`, `/${newLang}`);
+    setLangMenuOpen(false);
+    router.push(newPath);
+  };
+
   const openReviewModal = (lead: any) => {
     setActiveModalLead(lead);
     
-    // تنظيف اسم الشركة من رموز الداشبورد
+    // تنظيف اسم الشركة
     const cleanName = lead.company_name.replace(/🏢 /g, '').replace(/🎯.*\| /g, '').trim();
-    
-    // سحب النص الكامل القادم من السيرفر
     const fullText = lead.drafted_email || "";
     
     let finalSubject = `Exclusive Distribution Partnership - ${cleanName}`;
@@ -141,8 +147,29 @@ export default function CRMPage() {
             <Briefcase className="w-5 h-5" /> {isRtl ? 'إدارة الصفقات (CRM)' : 'Deals & RFQs'}
           </button>
         </nav>
-        <div className="p-4 border-t border-slate-800">
-          <button onClick={handleLogout} className="w-full flex justify-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg">
+        
+        <div className="p-4 border-t border-slate-800 space-y-2">
+          {/* محول اللغات */}
+          <div className="relative">
+            <button 
+              onClick={() => setLangMenuOpen(!langMenuOpen)}
+              className="w-full flex justify-between items-center px-4 py-2 text-sm text-slate-300 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-slate-400" />
+                <span>{currentLangCode === 'ar' ? 'العربية' : currentLangCode === 'tr' ? 'Türkçe' : 'English'}</span>
+              </div>
+            </button>
+            {langMenuOpen && (
+              <div className={`absolute bottom-full mb-2 w-full bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden z-50 ${isRtl ? 'right-0' : 'left-0'}`}>
+                <button onClick={() => switchLanguage('ar')} className="w-full text-start px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white">🇸🇦 العربية</button>
+                <button onClick={() => switchLanguage('en')} className="w-full text-start px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white">🇬🇧 English</button>
+                <button onClick={() => switchLanguage('tr')} className="w-full text-start px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white">🇹🇷 Türkçe</button>
+              </div>
+            )}
+          </div>
+
+          <button onClick={handleLogout} className="w-full flex justify-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
             <LogOut className="w-4 h-4" /> {isRtl ? 'تسجيل الخروج' : 'Logout'}
           </button>
         </div>
@@ -215,63 +242,70 @@ export default function CRMPage() {
         </div>
       </main>
 
+      {/* نافذة Outlook الاحترافية */}
       {activeModalLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between p-6 border-b border-slate-800 bg-slate-950/40">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-500/10 text-blue-400 rounded-lg"><Mail className="w-5 h-5" /></div>
-                <div>
-                  <h4 className="text-lg font-bold text-white">{isRtl ? 'مراجعة مقترح الشراكة الحصرية' : 'Review Exclusive Proposal'}</h4>
-                  <p className="text-xs text-slate-400">{isRtl ? 'المرسل إليه:' : 'Recipient:'} {activeModalLead.email}</p>
-                </div>
-              </div>
-              <button onClick={() => setActiveModalLead(null)} className="text-slate-400 hover:text-white p-2">
+          <div className="bg-slate-50 border border-slate-200 rounded-lg w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col h-[85vh]">
+            
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
+              <h4 className="text-lg font-semibold text-slate-800">
+                {isRtl ? 'رسالة جديدة' : 'New Message'}
+              </h4>
+              <button onClick={() => setActiveModalLead(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-2">{isRtl ? 'عنوان الرسالة (Subject)' : 'Subject'}</label>
+            <div className="bg-white px-6 py-2 border-b border-slate-200 text-sm">
+              <div className="flex items-center border-b border-slate-100 py-2">
+                <span className="w-20 text-slate-500">{isRtl ? 'مِن :' : 'From:'}</span>
+                <span className="font-medium text-slate-700 bg-slate-100 px-3 py-1 rounded-full text-xs">
+                  {user?.email || "deal@kian.business"}
+                </span>
+              </div>
+              <div className="flex items-center border-b border-slate-100 py-2">
+                <span className="w-20 text-slate-500">{isRtl ? 'إلى :' : 'To:'}</span>
+                <span className="font-medium text-slate-700 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs flex items-center gap-2">
+                  <Mail className="w-3 h-3" />
+                  {activeModalLead.email}
+                </span>
+              </div>
+              <div className="flex items-center py-2">
+                <span className="w-20 text-slate-500">{isRtl ? 'الموضوع :' : 'Subject:'}</span>
                 <input 
                   type="text" 
                   value={emailSubject} 
                   onChange={(e) => setEmailSubject(e.target.value)} 
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500" 
-                  dir="ltr"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-2">{isRtl ? 'نص الرسالة (يمكنك التعديل عليها بحرية)' : 'Email Body'}</label>
-                <textarea 
-                  rows={8} 
-                  value={emailBody} 
-                  onChange={(e) => setEmailBody(e.target.value)} 
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-sm leading-relaxed focus:outline-none focus:border-blue-500 resize-none" 
+                  className="flex-1 bg-transparent border-none focus:outline-none text-slate-800 font-medium" 
                   dir="ltr"
                 />
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-800 bg-slate-950/40 flex justify-end gap-3">
-              <button 
-                onClick={() => setActiveModalLead(null)} 
-                className="px-5 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-white font-medium text-sm">
-                {isRtl ? 'إلغاء' : 'Cancel'}
+            <div className="flex-1 p-6 bg-white overflow-y-auto">
+              <textarea 
+                value={emailBody} 
+                onChange={(e) => setEmailBody(e.target.value)} 
+                className="w-full h-full min-h-[300px] bg-transparent border-none text-slate-800 text-sm leading-relaxed focus:outline-none resize-none" 
+                dir="ltr"
+              />
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center">
+              <button onClick={() => setActiveModalLead(null)} className="text-slate-500 hover:text-slate-700 text-sm font-medium">
+                {isRtl ? 'إلغاء' : 'Discard'}
               </button>
               
               <button 
                 onClick={handleConfirmSend}
                 disabled={sendingId === activeModalLead.id}
-                className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 text-sm shadow-lg shadow-blue-500/20 disabled:bg-slate-700">
+                className="bg-[#0f6cbd] hover:bg-[#0c5b9e] text-white font-medium px-8 py-2 rounded shadow-sm flex items-center gap-2 text-sm transition-colors disabled:opacity-50">
                 {sendingId === activeModalLead.id ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                 ) : (
                   <Send className="w-4 h-4" />
                 )}
-                <span>{sendingId === activeModalLead.id ? (isRtl ? 'جاري الإرسال المعتمد...' : 'Sending...') : (isRtl ? 'اعتماد وإرسال الآن' : 'Confirm & Send')}</span>
+                <span>{sendingId === activeModalLead.id ? (isRtl ? 'جاري الإرسال...' : 'Sending...') : (isRtl ? 'إرسال المقترح' : 'Send Proposal')}</span>
               </button>
             </div>
           </div>
