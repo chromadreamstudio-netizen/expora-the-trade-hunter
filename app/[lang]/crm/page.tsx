@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { LayoutDashboard, Mail, MessageCircle, MapPin, CheckCircle, Clock, Send, Home, Briefcase, LogOut, X, Edit3, Globe } from "lucide-react";
+import { LayoutDashboard, Mail, MessageCircle, MapPin, CheckCircle, Clock, Send, Home, Briefcase, LogOut, X, Globe } from "lucide-react";
 
 export default function CRMPage() {
   const router = useRouter();
@@ -58,14 +58,12 @@ export default function CRMPage() {
   const openReviewModal = (lead: any) => {
     setActiveModalLead(lead);
     
-    // تنظيف اسم الشركة
     const cleanName = lead.company_name.replace(/🏢 /g, '').replace(/🎯.*\| /g, '').trim();
     const fullText = lead.drafted_email || "";
     
     let finalSubject = `Exclusive Distribution Partnership - ${cleanName}`;
     let finalBody = fullText;
 
-    // فصل العنوان عن نص الرسالة بذكاء
     if (fullText.startsWith("Subject:")) {
       const parts = fullText.split('\n\n');
       finalSubject = parts[0].replace('Subject:', '').trim(); 
@@ -149,7 +147,6 @@ export default function CRMPage() {
         </nav>
         
         <div className="p-4 border-t border-slate-800 space-y-2">
-          {/* محول اللغات */}
           <div className="relative">
             <button 
               onClick={() => setLangMenuOpen(!langMenuOpen)}
@@ -242,7 +239,6 @@ export default function CRMPage() {
         </div>
       </main>
 
-      {/* نافذة Outlook الاحترافية */}
       {activeModalLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-slate-50 border border-slate-200 rounded-lg w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col h-[85vh]">
